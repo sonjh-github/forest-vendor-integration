@@ -1,0 +1,636 @@
+openapi: 3.1.0
+info:
+  title: 산림재난 업체 연동 프록시 API
+  version: 1.0.0-draft
+  description: |
+    NDPS와 진인프라의 관리 SW·NMS·네트워크 제어기가 프록시 도달 전의
+    현장 장비, 통신 링크, 실제 또는 선언된 전달 경로를 보고하는 계약이다.
+
+    업체는 자사 장비번호를 사용한다. TOBE 프록시는 요청에 포함된 모든 장비번호를
+    Supabase의 통합 자산 UUID로 일괄 변환한다. 프록시 이후 내부 백엔드 라우팅은
+    이 업체 공개 계약의 범위가 아니다.
+
+    프록시는 UUID를 생성하거나 미등록 자산을 자동 생성하지 않는다. 기존 core.asset UUID와
+    매핑된 업체 장비번호만 허용하며, 미매핑 장비가 포함된 DELIVER 요청은 저장하지 않는다.
+
+    이 문서에는 보안·인증 규격을 정의하지 않는다.
+
+servers:
+  - url: https://{host}
+    description: 운영 프록시 서버
+    variables:
+      host: {default: api.example.com}
+  - url: http://localhost:{port}
+    description: 로컬 개발 프록시 서버
+    variables:
+      port: {default: "18010"}
+
+tags:
+  - name: NDPS
+    description: TVWS Base/CPE·NMS 연동
+  - name: JININFRA
+    description: RTK 단말·LPWA 게이트웨이·네트워크 제어기 연동
+  - name: TOBE
+    description: GCS 어댑터·AI 서비스 내부 상태 진단
+
+paths:
+  /ndps/register:
+    post:
+      tags: [NDPS]
+      operationId: registerNdpsTopology
+      summary: NDPS 장비와 프록시 이전 통신 구성 등록
+      description: |
+        TVWS Base/CPE, NMS, 백홀 장비와 장비 간 링크를 일괄 등록한다.
+        TOBE 프록시는 모든 vendorDeviceId를 DB에서 조회하고 통합 assetId를 반환한다.
+        미매핑 장비는 자동으로 운영 자산을 생성하지 않고 UNMAPPED로 반환한다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/NdpsRegisterRequest"}
+      responses:
+        "200":
+          description: 전체 장비 UUID 매핑 확인 완료
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RegisterResponse"}
+        "207":
+          description: 일부 장비만 UUID 매핑됨
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RegisterResponse"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "409": {$ref: "#/components/responses/MappingConflict"}
+
+  /ndps/invoke:
+    post:
+      tags: [NDPS]
+      operationId: invokeNdpsObservation
+      summary: NDPS 장비 상태와 프록시 이전 통신 경로 보고
+      description: |
+        데이터 발생 장비, HTTP 보고 주체, TVWS 수신 관측 및 프록시 도달 전 경로를 보고한다.
+        요청의 모든 장비번호가 UUID로 매핑되어야 DELIVER 처리가 가능하다.
+      parameters:
+        - $ref: "#/components/parameters/DeliveryMode"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/NdpsInvokeRequest"}
+      responses:
+        "200":
+          description: 검증 또는 저장 완료
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/InvokeResponse"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "404": {$ref: "#/components/responses/UnmappedDevices"}
+        "502": {$ref: "#/components/responses/ProcessingFailure"}
+        "504": {$ref: "#/components/responses/ProcessingTimeout"}
+
+  /ndps/health:
+    get:
+      tags: [NDPS]
+      operationId: getNdpsHealth
+      summary: NDPS 관리 장비·통신망 상태 진단
+      description: |
+        투비 서버가 NDPS로부터 실제 수신·저장한 메시지와 DB 매핑 상태를 요약한다.
+        문서에서 역방향 점검 인터페이스가 확인되지 않아 NDPS 장비로 요청을 보내지 않는다.
+      parameters:
+        - $ref: "#/components/parameters/HealthMode"
+      responses:
+        "200":
+          description: 상태 조회 성공
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HealthResponse"}
+
+  /jininfra/register:
+    post:
+      tags: [JININFRA]
+      operationId: registerJininfraTopology
+      summary: 진인프라 장비와 프록시 이전 통신 구성 등록
+      description: |
+        RTK 단말, LPWA 게이트웨이·기준국, 네트워크 제어기, 백홀 장비와 링크를 일괄 등록한다.
+        TOBE 프록시는 모든 vendorDeviceId를 DB에서 조회하고 통합 assetId를 반환한다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/JininfraRegisterRequest"}
+      responses:
+        "200":
+          description: 전체 장비 UUID 매핑 확인 완료
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RegisterResponse"}
+        "207":
+          description: 일부 장비만 UUID 매핑됨
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RegisterResponse"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "409": {$ref: "#/components/responses/MappingConflict"}
+
+  /jininfra/invoke:
+    post:
+      tags: [JININFRA]
+      operationId: invokeJininfraObservation
+      summary: 진인프라 장비 상태와 프록시 이전 통신 경로 보고
+      description: |
+        RTK 단말 또는 RTK·LPWA 게이트웨이 데이터를 보고한다. 단말, 수신 게이트웨이,
+        제어기 및 activePath에 포함된 모든 장비번호를 UUID로 일괄 변환한다.
+      parameters:
+        - $ref: "#/components/parameters/DeliveryMode"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/JininfraInvokeRequest"}
+      responses:
+        "200":
+          description: 검증 또는 저장 완료
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/InvokeResponse"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "404": {$ref: "#/components/responses/UnmappedDevices"}
+        "502": {$ref: "#/components/responses/ProcessingFailure"}
+        "504": {$ref: "#/components/responses/ProcessingTimeout"}
+
+  /jininfra/health:
+    get:
+      tags: [JININFRA]
+      operationId: getJininfraHealth
+      summary: 진인프라 게이트웨이·통신망 상태 진단
+      description: |
+        투비 서버가 진인프라로부터 실제 수신·저장한 메시지와 DB 매핑 상태를 요약한다.
+        문서에서 역방향 점검 인터페이스가 확인되지 않아 진인프라 장비로 요청을 보내지 않는다.
+      parameters:
+        - $ref: "#/components/parameters/HealthMode"
+      responses:
+        "200":
+          description: 상태 조회 성공
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HealthResponse"}
+
+  /tobe/health:
+    get:
+      tags: [TOBE]
+      operationId: getTobeDependencyHealth
+      summary: 투비 수신 서버와 DB 상태 진단
+      description: |
+        투비 프록시와 Supabase 연결 상태만 확인한다. 외부 장비나 서비스를 호출하지 않는다.
+      parameters:
+        - $ref: "#/components/parameters/HealthMode"
+      responses:
+        "200":
+          description: 상태 조회 성공
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HealthResponse"}
+
+components:
+  parameters:
+    HealthMode:
+      name: mode
+      in: query
+      required: false
+      description: 저장된 수신·매핑 상태만 조회한다. 외부 장비로 역방향 요청하지 않는다.
+      schema:
+        type: string
+        enum: [PASSIVE]
+        default: PASSIVE
+    DeliveryMode:
+      name: mode
+      in: query
+      required: false
+      description: VALIDATE_ONLY는 UUID 매핑과 형식만 검사하고 운영 데이터를 저장하지 않는다.
+      schema:
+        type: string
+        enum: [VALIDATE_ONLY, DELIVER]
+        default: DELIVER
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: 동일 데이터 재전송 시 최초 UUID를 유지한다. 생략하면 프록시가 생성한다.
+      schema: {type: string, format: uuid}
+
+  schemas:
+    NdpsRegisterRequest:
+      allOf:
+        - $ref: "#/components/schemas/TopologyRegisterRequest"
+        - type: object
+          properties:
+            vendor: {type: string, const: NDPS}
+
+    JininfraRegisterRequest:
+      allOf:
+        - $ref: "#/components/schemas/TopologyRegisterRequest"
+        - type: object
+          properties:
+            vendor: {type: string, const: JININFRA}
+
+    TopologyRegisterRequest:
+      type: object
+      required: [vendor, reportedByDeviceId, observedAt, devices]
+      properties:
+        vendor: {type: string, enum: [NDPS, JININFRA]}
+        reportedByDeviceId:
+          type: string
+          description: 이 요청을 생성한 NMS·제어기·연동 프로그램의 업체 장비번호
+        observedAt: {type: string, format: date-time}
+        topologyVersion: {type: [string, "null"]}
+        devices:
+          type: array
+          minItems: 1
+          items: {$ref: "#/components/schemas/VendorDevice"}
+
+    VendorDevice:
+      type: object
+      required: [vendorDeviceId, deviceType]
+      properties:
+        vendorDeviceId: {type: string, minLength: 1, maxLength: 200}
+        deviceType:
+          type: string
+          enum:
+            - TVWS_BASE
+            - TVWS_CPE
+            - TVWS_NMS
+            - RTK_TERMINAL
+            - RTK_LPWA_GATEWAY
+            - RTK_BASE_STATION
+            - NETWORK_CONTROLLER
+            - BACKHAUL_ROUTER
+            - COMMUNICATION_VEHICLE
+            - GCS_ADAPTER
+            - AI_SERVICE
+            - OTHER
+        serialNumber: {type: [string, "null"]}
+        modelName: {type: [string, "null"]}
+        firmwareVersion: {type: [string, "null"]}
+        connectedTo:
+          oneOf:
+            - $ref: "#/components/schemas/DeviceConnection"
+            - type: "null"
+          description: 이 장비가 데이터를 전달하는 상위 장비. 최상위 NMS·게이트웨이는 null 또는 생략한다.
+        attributes: {type: object, additionalProperties: true}
+
+    DeviceConnection:
+      type: object
+      required: [vendorDeviceId, medium, evidenceType]
+      properties:
+        vendorDeviceId:
+          type: string
+          description: 연결 대상이며 같은 devices 배열에 포함되어야 하는 업체 장비번호
+        medium: {$ref: "#/components/schemas/CommunicationMedium"}
+        evidenceType: {$ref: "#/components/schemas/EvidenceType"}
+        bidirectional: {type: boolean, default: true}
+        attributes: {type: object, additionalProperties: true}
+
+    RegisterResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [vendor, registrationStatus, mappedDevices, unmappedDeviceIds, checkedAt]
+          properties:
+            vendor: {type: string, enum: [NDPS, JININFRA]}
+            registrationStatus: {type: string, enum: [MAPPED, PARTIALLY_MAPPED, UNMAPPED]}
+            mappedDevices:
+              type: array
+              items: {$ref: "#/components/schemas/DeviceMappingResult"}
+            unmappedDeviceIds:
+              type: array
+              items: {type: string}
+            linksAccepted: {type: integer, minimum: 0}
+            checkedAt: {type: string, format: date-time}
+
+    DeviceMappingResult:
+      type: object
+      required: [vendorDeviceId, mapped, assetExists]
+      properties:
+        vendorDeviceId: {type: string}
+        assetId: {type: [string, "null"], format: uuid}
+        mapped: {type: boolean}
+        assetExists:
+          type: boolean
+          description: 반환된 assetId가 통합 자산 DB에 실제 존재하는지 확인한 결과
+        mappingStatus: {type: string, enum: [ACTIVE, PENDING, SUSPENDED, UNMAPPED, CONFLICT]}
+
+    InvokeContext:
+      type: object
+      required: [eventExternalId, sourceSystem, occurredAt, sourceDeviceId, reportedByDeviceId]
+      properties:
+        eventExternalId: {type: string}
+        sourceSystem: {type: string, minLength: 2, maxLength: 100}
+        occurredAt: {type: string, format: date-time}
+        sentAt: {type: [string, "null"], format: date-time}
+        sourceDeviceId:
+          type: string
+          description: 원 데이터를 발생시킨 업체 장비번호
+        reportedByDeviceId:
+          type: string
+          description: 프록시로 HTTP 요청을 보낸 NMS·제어기·연동 프로그램의 업체 장비번호
+
+    NdpsInvokeRequest:
+      type: object
+      required: [context, activePath, data]
+      properties:
+        context: {$ref: "#/components/schemas/InvokeContext"}
+        activePath:
+          type: array
+          items: {$ref: "#/components/schemas/ObservedHop"}
+        observations:
+          type: array
+          items: {$ref: "#/components/schemas/RadioObservation"}
+        data:
+          $ref: "#/components/schemas/TvwsData"
+
+    JininfraInvokeRequest:
+      oneOf:
+        - $ref: "#/components/schemas/RtkTerminalInvokeRequest"
+        - $ref: "#/components/schemas/RtkGatewayInvokeRequest"
+      discriminator:
+        propertyName: payloadType
+
+    RtkTerminalInvokeRequest:
+      type: object
+      required: [payloadType, context, activePath, data]
+      properties:
+        payloadType: {type: string, const: RTK_TERMINAL}
+        context: {$ref: "#/components/schemas/InvokeContext"}
+        activePath:
+          type: array
+          items: {$ref: "#/components/schemas/ObservedHop"}
+        observations:
+          type: array
+          items: {$ref: "#/components/schemas/RadioObservation"}
+        data: {$ref: "#/components/schemas/RtkTerminalData"}
+
+    RtkGatewayInvokeRequest:
+      type: object
+      required: [payloadType, context, activePath, data]
+      properties:
+        payloadType: {type: string, const: RTK_LPWA_GATEWAY}
+        context: {$ref: "#/components/schemas/InvokeContext"}
+        activePath:
+          type: array
+          items: {$ref: "#/components/schemas/ObservedHop"}
+        observations:
+          type: array
+          items: {$ref: "#/components/schemas/RadioObservation"}
+        data: {$ref: "#/components/schemas/RtkGatewayData"}
+
+    ObservedHop:
+      type: object
+      required: [sequence, fromDeviceId, toDeviceId, medium, evidenceType]
+      properties:
+        sequence: {type: integer, minimum: 1}
+        fromDeviceId: {type: string}
+        toDeviceId: {type: string}
+        medium: {$ref: "#/components/schemas/CommunicationMedium"}
+        evidenceType: {$ref: "#/components/schemas/EvidenceType"}
+        observedAt: {type: [string, "null"], format: date-time}
+        status: {type: string, enum: [ACTIVE, DEGRADED, DOWN, UNKNOWN]}
+        attributes: {type: object, additionalProperties: true}
+
+    RadioObservation:
+      type: object
+      required: [sourceDeviceId, gatewayDeviceId, medium, receivedAt]
+      properties:
+        sourceDeviceId: {type: string}
+        gatewayDeviceId: {type: string}
+        medium: {$ref: "#/components/schemas/CommunicationMedium"}
+        receivedAt: {type: string, format: date-time}
+        sequence: {type: [integer, "null"], minimum: 0}
+        channel: {type: [string, "null"]}
+        slot: {type: [integer, "null"], minimum: 0}
+        rssiDbm: {type: [number, "null"]}
+        snrDb: {type: [number, "null"]}
+        selected: {type: boolean, default: true}
+
+    CommunicationMedium:
+      type: string
+      enum: [LPWA, TVWS, ETHERNET, LTE, 5G, LEO, WIFI, RF_400MHZ, SERIAL, OTHER, UNKNOWN]
+
+    EvidenceType:
+      type: string
+      enum: [OBSERVED, DECLARED, INFERRED, UNKNOWN]
+
+    TvwsData:
+      type: object
+      required: [baseDeviceId, cpeDeviceId, observedAt, operationalStatus]
+      properties:
+        baseDeviceId: {type: string}
+        cpeDeviceId: {type: string}
+        observedAt: {type: string, format: date-time}
+        operationalStatus: {type: string, enum: [ONLINE, DEGRADED, OFFLINE]}
+        channel: {type: [string, "null"]}
+        signalStrengthDbm: {type: [number, "null"]}
+        throughputMbps: {type: [number, "null"], minimum: 0}
+        latencyMs: {type: [number, "null"], minimum: 0}
+        packetLossPct: {type: [number, "null"], minimum: 0, maximum: 100}
+        connectedTerminals: {type: [integer, "null"], minimum: 0}
+        attributes: {type: object, additionalProperties: true}
+
+    RtkTerminalData:
+      type: object
+      required: [terminalDeviceId, personExternalId, observedAt, geometry, positioningMethod, activeLink]
+      properties:
+        terminalDeviceId: {type: string}
+        personExternalId: {type: string}
+        observedAt: {type: string, format: date-time}
+        geometry: {$ref: "#/components/schemas/GeoPoint"}
+        positioningMethod: {type: string, enum: [RTK_FIXED, RTK_FLOAT, GNSS]}
+        horizontalAccuracyM: {type: [number, "null"], minimum: 0}
+        activeLink: {type: string, enum: [LPWA, LTE]}
+        batteryPercent: {type: [number, "null"], minimum: 0, maximum: 100}
+        emergency: {type: boolean, default: false}
+        attributes: {type: object, additionalProperties: true}
+
+    RtkGatewayData:
+      type: object
+      required: [gatewayDeviceId, observedAt, operationalStatus, rtcmAvailable, connectedTerminals]
+      properties:
+        gatewayDeviceId: {type: string}
+        baseStationDeviceId: {type: [string, "null"]}
+        observedAt: {type: string, format: date-time}
+        operationalStatus: {type: string, enum: [ONLINE, DEGRADED, OFFLINE]}
+        rtcmFormat: {type: [string, "null"]}
+        rtcmAvailable: {type: boolean}
+        correctionAgeSeconds: {type: [number, "null"], minimum: 0}
+        connectedTerminals: {type: integer, minimum: 0}
+        receivedTerminalDeviceIds:
+          type: array
+          items: {type: string}
+        attributes: {type: object, additionalProperties: true}
+
+    GeoPoint:
+      type: object
+      required: [type, coordinates]
+      properties:
+        type: {type: string, const: Point}
+        coordinates:
+          type: array
+          minItems: 2
+          maxItems: 3
+          prefixItems:
+            - {type: number, minimum: -180, maximum: 180}
+            - {type: number, minimum: -90, maximum: 90}
+            - {type: number}
+
+    InvokeResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [accepted, requestId, mode, mapping, persisted]
+          properties:
+            accepted: {type: boolean}
+            requestId: {type: string, format: uuid}
+            mode: {type: string, enum: [VALIDATE_ONLY, DELIVER]}
+            mapping:
+              type: object
+              required: [allMapped, mappedDevices, unmappedDeviceIds]
+              properties:
+                allMapped: {type: boolean}
+                mappedDevices:
+                  type: array
+                  items: {$ref: "#/components/schemas/DeviceMappingResult"}
+                unmappedDeviceIds:
+                  type: array
+                  items: {type: string}
+            normalizedPath:
+              type: array
+              description: 업체 장비번호가 assetId로 치환된 프록시 이전 경로
+              items:
+                type: object
+                required: [sequence, fromAssetId, toAssetId, medium, evidenceType]
+                properties:
+                  sequence: {type: integer}
+                  fromAssetId: {type: string, format: uuid}
+                  toAssetId: {type: string, format: uuid}
+                  medium: {$ref: "#/components/schemas/CommunicationMedium"}
+                  evidenceType: {$ref: "#/components/schemas/EvidenceType"}
+            persisted: {type: boolean}
+            recordId: {type: [string, "null"], format: uuid}
+            processedAt: {type: string, format: date-time}
+
+    HealthResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [vendor, healthMode, diagnosticStatus, proxyStatus, databaseStatus, registeredDevices, receivingDevices, devices, links, networks]
+          properties:
+            vendor: {type: string, enum: [NDPS, JININFRA, TOBE]}
+            healthMode: {type: string, enum: [PASSIVE]}
+            diagnosticStatus: {type: string, enum: [HEALTHY, DEGRADED, FAILED, INCOMPLETE]}
+            diagnosticRunId: {type: string, format: uuid}
+            startedAt: {type: string, format: date-time}
+            completedAt: {type: string, format: date-time}
+            proxyStatus: {type: string, enum: [UP, DEGRADED, DOWN]}
+            databaseStatus: {type: string, enum: [REACHABLE, UNREACHABLE]}
+            registeredDevices: {type: integer, minimum: 0}
+            receivingDevices: {type: integer, minimum: 0}
+            unmappedDevices: {type: integer, minimum: 0}
+            lastReceivedAt: {type: [string, "null"], format: date-time}
+            lastPersistedAt: {type: [string, "null"], format: date-time}
+            devices:
+              type: array
+              items: {$ref: "#/components/schemas/DeviceHealthResult"}
+            links:
+              type: array
+              items: {$ref: "#/components/schemas/LinkHealthResult"}
+            networks:
+              type: array
+              items:
+                type: object
+                required: [medium, status]
+                properties:
+                  medium: {$ref: "#/components/schemas/CommunicationMedium"}
+                  status: {type: string, enum: [ACTIVE, DEGRADED, DOWN, UNVERIFIED]}
+                  activeLinks: {type: integer, minimum: 0}
+                  receivingDevices: {type: integer, minimum: 0}
+                  staleDevices: {type: integer, minimum: 0}
+
+    DeviceHealthResult:
+      type: object
+      required: [vendorDeviceId, assetId, status, evidenceType]
+      properties:
+        vendorDeviceId: {type: string}
+        assetId:
+          type: [string, "null"]
+          format: uuid
+          description: UUID 매핑 전이거나 관리 서비스가 자산으로 등록되지 않은 경우 null
+        deviceType: {type: string}
+        status: {type: string, enum: [RECEIVING, UNVERIFIED]}
+        mappingStatus: {type: string, enum: [ACTIVE, PENDING, SUSPENDED]}
+        evidenceType: {$ref: "#/components/schemas/EvidenceType"}
+        lastSeenAt: {type: [string, "null"], format: date-time}
+
+    LinkHealthResult:
+      type: object
+      required: [fromDeviceId, toDeviceId, medium, status, evidenceType]
+      properties:
+        fromDeviceId: {type: string}
+        toDeviceId: {type: string}
+        medium: {$ref: "#/components/schemas/CommunicationMedium"}
+        status: {type: string, enum: [ACTIVE, DEGRADED, DOWN, STALE, UNVERIFIED]}
+        evidenceType: {$ref: "#/components/schemas/EvidenceType"}
+        checkedAt: {type: string, format: date-time}
+        metrics: {type: object, additionalProperties: true}
+        failedAtDeviceId:
+          type: [string, "null"]
+          description: 진단 결과 처음 실패가 확인된 장비번호
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, retryable]
+          properties:
+            code: {type: string}
+            message: {type: string}
+            retryable: {type: boolean}
+            unmappedDeviceIds:
+              type: array
+              items: {type: string}
+            details: {type: object, additionalProperties: true}
+
+  responses:
+    BadRequest:
+      description: 요청 형식 또는 필드 오류
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ErrorResponse"}
+    UnmappedDevices:
+      description: 요청에 UUID 매핑이 없는 업체 장비번호가 포함됨
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ErrorResponse"}
+    MappingConflict:
+      description: 업체 장비번호 또는 시리얼이 기존 통합 자산과 충돌함
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ErrorResponse"}
+    ProcessingFailure:
+      description: 프록시 내부 처리 또는 DB 저장 실패
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ErrorResponse"}
+    ProcessingTimeout:
+      description: 처리가 제한시간 안에 완료되지 않음
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ErrorResponse"}
