@@ -12,7 +12,7 @@ function numberValue(name: string, fallback: number) {
 }
 
 export const config = {
-  host: process.env.HOST?.trim() || "127.0.0.1",
+  host: process.env.HOST?.trim() || "0.0.0.0",
   port: numberValue("PORT", 18010),
   healthSchema: process.env.SUPABASE_HEALTH_SCHEMA?.trim() || "core",
   healthTable: process.env.SUPABASE_HEALTH_TABLE?.trim() || "disaster_event",
