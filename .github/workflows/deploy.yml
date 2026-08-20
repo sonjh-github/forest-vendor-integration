@@ -5,22 +5,34 @@ on:
     branches:
       - main
 
+concurrency:
+  group: forest-vendor-integration-production
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: Deploy to EC2
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            set -e
+
             cd /home/ubuntu/server/forest-vendor-integration
 
             git fetch origin main
             git reset --hard origin/main
+
+            # .env가 없으면 배포 중단
+            test -f .env
+
+            # 영구 로그 디렉터리
+            mkdir -p /home/ubuntu/logs/forest-vendor-integration
 
             docker build \
               -f dockerfile \
@@ -31,5 +43,12 @@ jobs:
             docker run -d \
               --name forest-vendor-integration \
               --restart unless-stopped \
+              --log-opt max-size=10m \
+              --log-opt max-file=5 \
+              --env-file /home/ubuntu/server/forest-vendor-integration/.env \
               -p 127.0.0.1:18010:18010 \
+              -v /home/ubuntu/logs/forest-vendor-integration:/app/logs \
               forest-vendor-integration
+
+            docker ps \
+              --filter "name=forest-vendor-integration"

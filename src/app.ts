@@ -1,12 +1,212 @@
 import { Hono } from "hono";
+import { appendFile, mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import { jininfraRoutes } from "./jininfra/routes.js";
 import { ndpsRoutes } from "./ndps/routes.js";
 import { tobeRoutes } from "./tobe/routes.js";
 
 export const app = new Hono();
-app.get("/", (c) => c.json({ service: "forest-vendor-proxy", status: "ok" }));
+
+// ==========================================
+// [헬퍼 함수] 로그 출력용 한국 시간(KST) 포맷터
+// 서버 / Docker timezone은 변경하지 않음
+// ==========================================
+function getKstTime(): {
+  timestamp: string;
+  dateOnly: string;
+} {
+  const now = new Date();
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(now);
+
+  const getPart = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((part) => part.type === type)?.value ?? "";
+
+  const year = getPart("year");
+  const month = getPart("month");
+  const day = getPart("day");
+  const hour = getPart("hour");
+  const minute = getPart("minute");
+  const second = getPart("second");
+
+  const milliseconds = String(now.getMilliseconds()).padStart(3, "0");
+
+  return {
+    dateOnly: `${year}-${month}-${day}`,
+    timestamp: `${year}-${month}-${day} ${hour}:${minute}:${second}.${milliseconds}`,
+  };
+}
+
+// ==========================================
+// [헬퍼 함수] 파일에 로그 기록
+// ==========================================
+async function saveLogToFile(
+  logData: object,
+  dateOnly: string,
+): Promise<void> {
+  try {
+    const logDir = join(process.cwd(), "logs");
+
+    await mkdir(logDir, {
+      recursive: true,
+    });
+
+    // 한국 날짜 기준 파일 생성
+    // 예: logs/2026-08-20.log
+    const filePath = join(logDir, `${dateOnly}.log`);
+
+    // JSON Lines 형식
+    const logLine = `${JSON.stringify(logData)}\n`;
+
+    await appendFile(filePath, logLine, "utf-8");
+  } catch (error) {
+    console.error("로그 파일 저장 실패:", error);
+  }
+}
+
+// ==========================================
+// [미들웨어] 요청 / 응답 인터셉트 및 로그 기록
+// ==========================================
+app.use("*", async (c, next) => {
+  const startTime = Date.now();
+
+  const method = c.req.method;
+  const url = c.req.url;
+
+  // ------------------------------------------
+  // 1. Request Body 파싱
+  // ------------------------------------------
+  let reqBody: unknown = null;
+
+  try {
+    const contentType = c.req.header("content-type") ?? "";
+
+    if (contentType.includes("application/json")) {
+      reqBody = await c.req.raw.clone().json();
+    } else if (
+      contentType.includes("text/") ||
+      contentType.includes("application/x-www-form-urlencoded")
+    ) {
+      reqBody = await c.req.raw.clone().text();
+    }
+  } catch {
+    reqBody = "[Parsing Error or Empty Body]";
+  }
+
+  // 실제 라우터 / 미들웨어 실행
+  await next();
+
+  // ------------------------------------------
+  // 2. Response Body 파싱
+  // ------------------------------------------
+  const duration = Date.now() - startTime;
+
+  const res = c.res;
+
+  let resBody: unknown = null;
+
+  try {
+    const resContentType = res.headers.get("content-type") ?? "";
+
+    if (resContentType.includes("application/json")) {
+      resBody = await res.clone().json();
+    } else if (resContentType.includes("text/")) {
+      resBody = await res.clone().text();
+    }
+  } catch {
+    resBody = "[Parsing Error or Binary Data]";
+  }
+
+  // ------------------------------------------
+  // 3. 한국 시간 기준 로그 생성
+  // ------------------------------------------
+  const { timestamp, dateOnly } = getKstTime();
+
+  const logData = {
+    timestamp,
+
+    method,
+    url,
+
+    status: res.status,
+
+    // 숫자로 저장하는 편이 추후 분석에 유리함
+    durationMs: duration,
+
+    request: {
+      headers: {
+        "user-agent": c.req.header("user-agent"),
+        "content-type": c.req.header("content-type"),
+      },
+
+      body: reqBody,
+    },
+
+    response: {
+      body: resBody,
+    },
+  };
+
+  // Docker stdout 로그
+  console.log(JSON.stringify(logData));
+
+  // 날짜별 파일 로그
+  void saveLogToFile(logData, dateOnly);
+});
+
+// ==========================================
+// 라우트 정의
+// ==========================================
+
+app.get("/", (c) =>
+  c.json({
+    service: "forest-vendor-proxy",
+    status: "ok",
+  }),
+);
+
 app.route("/ndps", ndpsRoutes);
 app.route("/jininfra", jininfraRoutes);
 app.route("/tobe", tobeRoutes);
-app.notFound((c) => c.json({ error: { code: "NOT_FOUND", message: "지원하지 않는 경로입니다." } }, 404));
-app.onError((error, c) => c.json({ error: { code: "PROCESSING_FAILURE", message: error.message, retryable: true } }, 502));
+
+// ==========================================
+// 404
+// ==========================================
+
+app.notFound((c) =>
+  c.json(
+    {
+      error: {
+        code: "NOT_FOUND",
+        message: "지원하지 않는 경로입니다.",
+      },
+    },
+    404,
+  ),
+);
+
+// ==========================================
+// Error Handler
+// ==========================================
+
+app.onError((error, c) =>
+  c.json(
+    {
+      error: {
+        code: "PROCESSING_FAILURE",
+        message: error.message,
+        retryable: true,
+      },
+    },
+    502,
+  ),
+);
