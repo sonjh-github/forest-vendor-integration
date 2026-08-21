@@ -4,7 +4,7 @@ import { assertJininfraInvokeRequest, assertJininfraRegisterRequest } from "../s
 
 // 아래 장비번호·인원번호·좌표·시각은 실제 업체 규격 확정 전 사용하는 테스트 전용 임시 값이다.
 const observedAt = "2026-08-13T09:00:00.000Z";
-const jininfraTopologyFixture = { vendor: "JININFRA", reportedByDeviceId: "GW-1", observedAt, devices: [{ vendorDeviceId: "GW-1", deviceType: "RTK_LPWA_GATEWAY", connectedTo: null }, { vendorDeviceId: "TERM-1", deviceType: "RTK_TERMINAL", connectedTo: { vendorDeviceId: "GW-1", medium: "LPWA", evidenceType: "DECLARED" } }] };
+const jininfraRegisterFixture = { vendor: "JININFRA", reportedByDeviceId: "GW-1", observedAt, devices: [{ vendorDeviceId: "GW-1", deviceType: "RTK_LPWA_GATEWAY" }, { vendorDeviceId: "TERM-1", deviceType: "RTK_TERMINAL" }] };
 const gatewayFixture = (operationalStatus: string, medium?: string) => ({
   payloadType: "RTK_LPWA_GATEWAY",
   context: { eventExternalId: "E-1", sourceSystem: "jininfra", occurredAt: observedAt, sourceDeviceId: "GW-1", reportedByDeviceId: "GW-1" },
@@ -20,8 +20,8 @@ const terminalFixture = (positioningMethod: string, activeLink: string) => ({
 const wrongDeviceFixture = { vendor: "JININFRA", reportedByDeviceId: "NMS-1", observedAt, devices: [{ vendorDeviceId: "NMS-1", deviceType: "TVWS_NMS" }] };
 
 // 정상 시나리오: 게이트웨이 상태와 단말 위치 조합을 검증한다.
-test("진인프라: RTK 단말·LPWA 게이트웨이 링크 등록 (임시 값)", () => {
-  assert.doesNotThrow(() => assertJininfraRegisterRequest(jininfraTopologyFixture));
+test("진인프라: RTK 단말·LPWA 게이트웨이 장비 등록 (임시 값)", () => {
+  assert.doesNotThrow(() => assertJininfraRegisterRequest(jininfraRegisterFixture));
 });
 
 for (const operationalStatus of ["ONLINE", "DEGRADED", "OFFLINE"]) {

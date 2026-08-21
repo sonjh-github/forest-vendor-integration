@@ -29,14 +29,6 @@ export function assertNdpsRegisterRequest(value: unknown): asserts value is Regi
   const ids = new Set(value.devices.map((device) => (device as Record<string, unknown>).vendorDeviceId));
   if (ids.size !== value.devices.length) throw new Error("devices의 vendorDeviceId가 중복되었습니다.");
   if (!ids.has(value.reportedByDeviceId)) throw new Error("reportedByDeviceId는 devices에 포함되어야 합니다.");
-  for (const [index, device] of value.devices.entries()) {
-    if (device.connectedTo == null) continue;
-    object(device.connectedTo, `devices[${index}].connectedTo`);
-    text(device.connectedTo.vendorDeviceId, `devices[${index}].connectedTo.vendorDeviceId`);
-    if (!media.has(String(device.connectedTo.medium))) throw new Error(`devices[${index}].connectedTo.medium은 NDPS 지원 통신방식이 아닙니다.`);
-    if (!evidence.has(String(device.connectedTo.evidenceType))) throw new Error(`devices[${index}].connectedTo.evidenceType이 올바르지 않습니다.`);
-    if (!ids.has(device.connectedTo.vendorDeviceId)) throw new Error(`devices[${index}].connectedTo가 미등록 NDPS 장비를 참조합니다.`);
-  }
 }
 
 export function assertNdpsInvokeRequest(value: unknown): asserts value is InvokeRequest {

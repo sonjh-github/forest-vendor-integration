@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { errorCode, errorMessage, errorStatus } from "../shared/route-support.js";
-import { readVendorHealth } from "../tobe/services/health.js";
+import { fetchVendorHealth } from "../core/client.js";
 import { assertJininfraInvokeRequest, assertJininfraRegisterRequest } from "./contract.js";
-import { invokeJininfra, registerJininfraTopology } from "./integration.js";
+import { invokeJininfra, registerJininfraDevices } from "./integration.js";
 
 export const jininfraRoutes = new Hono();
 
@@ -10,7 +10,7 @@ jininfraRoutes.post("/register", async (c) => {
   try {
     const body = await c.req.json();
     assertJininfraRegisterRequest(body);
-    const data = await registerJininfraTopology(body);
+    const data = await registerJininfraDevices(body);
     return c.json({ data }, data.registrationStatus === "MAPPED" ? 200 : 207);
   } catch (error) {
     const status = errorStatus(error);
@@ -32,4 +32,4 @@ jininfraRoutes.post("/invoke", async (c) => {
   }
 });
 
-jininfraRoutes.get("/health", async (c) => c.json({ data: await readVendorHealth("JININFRA") }));
+jininfraRoutes.get("/health", async (c) => c.json({ data: await fetchVendorHealth("JININFRA") }));

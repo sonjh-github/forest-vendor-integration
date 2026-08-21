@@ -3,7 +3,6 @@ import { appendFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { jininfraRoutes } from "./jininfra/routes.js";
 import { ndpsRoutes } from "./ndps/routes.js";
-import { tobeRoutes } from "./tobe/routes.js";
 
 export const app = new Hono();
 
@@ -176,7 +175,6 @@ app.get("/", (c) =>
 
 app.route("/ndps", ndpsRoutes);
 app.route("/jininfra", jininfraRoutes);
-app.route("/tobe", tobeRoutes);
 
 // ==========================================
 // 404

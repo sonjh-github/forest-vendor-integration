@@ -1,15 +1,14 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { app } from "../src/app.js";
-import { supabase } from "../src/tobe/db/client.js";
 
 const observedAt = new Date().toISOString();
 const register = {
-  vendor: "NDPS", reportedByDeviceId: "SIM-COMMAND-01", observedAt, topologyVersion: "ndps-test-1",
+  vendor: "NDPS", reportedByDeviceId: "SIM-COMMAND-01", observedAt,
   devices: [
-    { vendorDeviceId: "SIM-TVWS-BS-01", deviceType: "TVWS_BASE", connectedTo: { vendorDeviceId: "SIM-COMMAND-01", medium: "ETHERNET", evidenceType: "DECLARED" } },
-    { vendorDeviceId: "SIM-TVWS-CPE-01", deviceType: "TVWS_CPE", connectedTo: { vendorDeviceId: "SIM-TVWS-BS-01", medium: "TVWS", evidenceType: "DECLARED" } },
-    { vendorDeviceId: "SIM-COMMAND-01", deviceType: "TVWS_NMS", connectedTo: null },
+    { vendorDeviceId: "SIM-TVWS-BS-01", deviceType: "TVWS_BASE" },
+    { vendorDeviceId: "SIM-TVWS-CPE-01", deviceType: "TVWS_CPE" },
+    { vendorDeviceId: "SIM-COMMAND-01", deviceType: "TVWS_NMS" },
   ],
 };
 const invoke = {
@@ -36,11 +35,6 @@ assert.equal(deliverResponse.status, 200, JSON.stringify(deliverBody));
 assert.equal(deliverBody.data?.persisted, true);
 assert.equal(deliverBody.data?.requestId, requestId);
 
-const { data: stored, error } = await supabase.schema("core").from("vendor_integration_message").select("vendor_code,status").eq("request_id", requestId).single();
-assert.ifError(error);
-assert.equal(stored.vendor_code, "NDPS");
-assert.equal(stored.status, "PERSISTED");
-
 const duplicateResponse = await app.request("/ndps/invoke?mode=DELIVER", { method: "POST", headers: { "content-type": "application/json", "Idempotency-Key": requestId }, body: JSON.stringify(invoke) });
 const duplicateBody = await duplicateResponse.json() as { data?: { duplicate?: boolean } };
 assert.equal(duplicateResponse.status, 200);
@@ -52,7 +46,7 @@ assert.equal(healthResponse.status, 200);
 assert.equal(healthBody.data?.databaseStatus, "REACHABLE");
 
 const unknownId = `NDPS-UNMAPPED-${Date.now()}`;
-const unmappedRegisterResponse = await app.request("/ndps/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ vendor: "NDPS", reportedByDeviceId: unknownId, observedAt, devices: [{ vendorDeviceId: unknownId, deviceType: "TVWS_NMS", connectedTo: null }] }) });
+const unmappedRegisterResponse = await app.request("/ndps/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ vendor: "NDPS", reportedByDeviceId: unknownId, observedAt, devices: [{ vendorDeviceId: unknownId, deviceType: "TVWS_NMS" }] }) });
 const unmappedRegisterBody = await unmappedRegisterResponse.json() as { data?: { registrationStatus?: string; unmappedDeviceIds?: string[] } };
 assert.equal(unmappedRegisterResponse.status, 207);
 assert.equal(unmappedRegisterBody.data?.registrationStatus, "UNMAPPED");

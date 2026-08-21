@@ -5,11 +5,15 @@ export function errorMessage(error: unknown) {
 }
 
 export function errorStatus(error: unknown): 400 | 409 | 502 | 504 {
+  if (error && typeof error === "object" && "status" in error) {
+    const status = Number(error.status);
+    if (status === 409 || status === 502 || status === 504) return status;
+  }
   const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
   const detail = errorMessage(error).toLowerCase();
   if (code === "23505") return 409;
   if (detail.includes("timeout") || detail.includes("timed out")) return 504;
-  if (code.startsWith("PGRST") || detail.includes("fetch failed") || detail.includes("database")) return 502;
+  if (code.startsWith("CORE_") || detail.includes("본 서버")) return 502;
   return 400;
 }
 

@@ -2,4 +2,6 @@ node_modules/
 dist/
 .dev-runtime/
 *.log
+/logs
 .env*
+!.env.example

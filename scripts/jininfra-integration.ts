@@ -1,14 +1,13 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { app } from "../src/app.js";
-import { supabase } from "../src/tobe/db/client.js";
 
 const observedAt = new Date().toISOString();
 const register = {
-  vendor: "JININFRA", reportedByDeviceId: "SIM-RTK-BASE-01", observedAt, topologyVersion: "jininfra-test-1",
+  vendor: "JININFRA", reportedByDeviceId: "SIM-RTK-BASE-01", observedAt,
   devices: [
-    { vendorDeviceId: "SIM-RTK-BASE-01", deviceType: "RTK_LPWA_GATEWAY", connectedTo: null },
-    { vendorDeviceId: "SIM-RTK-01", deviceType: "RTK_TERMINAL", connectedTo: { vendorDeviceId: "SIM-RTK-BASE-01", medium: "LPWA", evidenceType: "DECLARED" } },
+    { vendorDeviceId: "SIM-RTK-BASE-01", deviceType: "RTK_LPWA_GATEWAY" },
+    { vendorDeviceId: "SIM-RTK-01", deviceType: "RTK_TERMINAL" },
   ],
 };
 const invoke = {
@@ -36,11 +35,6 @@ assert.equal(deliverResponse.status, 200, JSON.stringify(deliverBody));
 assert.equal(deliverBody.data?.persisted, true);
 assert.equal(deliverBody.data?.requestId, requestId);
 
-const { data: stored, error } = await supabase.schema("core").from("vendor_integration_message").select("vendor_code,status").eq("request_id", requestId).single();
-assert.ifError(error);
-assert.equal(stored.vendor_code, "JININFRA");
-assert.equal(stored.status, "PERSISTED");
-
 const duplicateResponse = await app.request("/jininfra/invoke?mode=DELIVER", { method: "POST", headers: { "content-type": "application/json", "Idempotency-Key": requestId }, body: JSON.stringify(invoke) });
 const duplicateBody = await duplicateResponse.json() as { data?: { duplicate?: boolean } };
 assert.equal(duplicateResponse.status, 200);
@@ -52,7 +46,7 @@ assert.equal(healthResponse.status, 200);
 assert.equal(healthBody.data?.databaseStatus, "REACHABLE");
 
 const unknownId = `JININFRA-UNMAPPED-${Date.now()}`;
-const unmappedRegisterResponse = await app.request("/jininfra/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ vendor: "JININFRA", reportedByDeviceId: unknownId, observedAt, devices: [{ vendorDeviceId: unknownId, deviceType: "RTK_LPWA_GATEWAY", connectedTo: null }] }) });
+const unmappedRegisterResponse = await app.request("/jininfra/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ vendor: "JININFRA", reportedByDeviceId: unknownId, observedAt, devices: [{ vendorDeviceId: unknownId, deviceType: "RTK_LPWA_GATEWAY" }] }) });
 const unmappedRegisterBody = await unmappedRegisterResponse.json() as { data?: { registrationStatus?: string; unmappedDeviceIds?: string[] } };
 assert.equal(unmappedRegisterResponse.status, 207);
 assert.equal(unmappedRegisterBody.data?.registrationStatus, "UNMAPPED");

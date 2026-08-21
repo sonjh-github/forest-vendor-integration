@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { errorCode, errorMessage, errorStatus } from "../shared/route-support.js";
-import { readVendorHealth } from "../tobe/services/health.js";
+import { fetchVendorHealth } from "../core/client.js";
 import { assertNdpsInvokeRequest, assertNdpsRegisterRequest } from "./contract.js";
-import { invokeNdps, registerNdpsTopology } from "./integration.js";
+import { invokeNdps, registerNdpsDevices } from "./integration.js";
 
 export const ndpsRoutes = new Hono();
 
@@ -10,7 +10,7 @@ ndpsRoutes.post("/register", async (c) => {
   try {
     const body = await c.req.json();
     assertNdpsRegisterRequest(body);
-    const data = await registerNdpsTopology(body);
+    const data = await registerNdpsDevices(body);
     return c.json({ data }, data.registrationStatus === "MAPPED" ? 200 : 207);
   } catch (error) {
     const status = errorStatus(error);
@@ -32,4 +32,4 @@ ndpsRoutes.post("/invoke", async (c) => {
   }
 });
 
-ndpsRoutes.get("/health", async (c) => c.json({ data: await readVendorHealth("NDPS") }));
+ndpsRoutes.get("/health", async (c) => c.json({ data: await fetchVendorHealth("NDPS") }));

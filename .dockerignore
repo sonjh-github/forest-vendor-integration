@@ -2,11 +2,12 @@ node_modules
 dist
 .env
 .env.*
+!.env.example
 .git
 .github
 .dev-runtime
 *.log
-node_modules/
-dist/
-.dev-runtime/
-*.log
+logs
+test
+scripts
+evidence

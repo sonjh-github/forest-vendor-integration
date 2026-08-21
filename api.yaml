@@ -6,9 +6,9 @@ info:
     NDPS와 진인프라의 관리 SW·NMS·네트워크 제어기가 프록시 도달 전의
     현장 장비, 통신 링크, 실제 또는 선언된 전달 경로를 보고하는 계약이다.
 
-    업체는 자사 장비번호를 사용한다. TOBE 프록시는 요청에 포함된 모든 장비번호를
-    Supabase의 통합 자산 UUID로 일괄 변환한다. 프록시 이후 내부 백엔드 라우팅은
-    이 업체 공개 계약의 범위가 아니다.
+    업체는 자사 장비번호를 사용한다. 장비 연동 서버는 캐시를 우선 조회하고,
+    캐시 미스일 때만 본 서버 내부 API에서 통합 자산 UUID를 조회한다.
+    DB 접근은 본 서버만 수행하며 내부 백엔드 API는 이 공개 계약의 범위가 아니다.
 
     프록시는 UUID를 생성하거나 미등록 자산을 자동 생성하지 않는다. 기존 core.asset UUID와
     매핑된 업체 장비번호만 허용하며, 미매핑 장비가 포함된 DELIVER 요청은 저장하지 않는다.
@@ -30,18 +30,16 @@ tags:
     description: TVWS Base/CPE·NMS 연동
   - name: JININFRA
     description: RTK 단말·LPWA 게이트웨이·네트워크 제어기 연동
-  - name: TOBE
-    description: GCS 어댑터·AI 서비스 내부 상태 진단
 
 paths:
   /ndps/register:
     post:
       tags: [NDPS]
-      operationId: registerNdpsTopology
-      summary: NDPS 장비와 프록시 이전 통신 구성 등록
+      operationId: registerNdpsDevices
+      summary: NDPS 장비 UUID 매핑 확인 및 캐시 적재
       description: |
-        TVWS Base/CPE, NMS, 백홀 장비와 장비 간 링크를 일괄 등록한다.
-        TOBE 프록시는 모든 vendorDeviceId를 DB에서 조회하고 통합 assetId를 반환한다.
+        TVWS Base/CPE, NMS, 백홀 장비의 UUID 매핑을 일괄 확인한다.
+        장비 연동 서버는 캐시 또는 본 서버 API에서 vendorDeviceId의 통합 assetId를 확인한다.
         미매핑 장비는 자동으로 운영 자산을 생성하지 않고 UNMAPPED로 반환한다.
       requestBody:
         required: true
@@ -109,11 +107,11 @@ paths:
   /jininfra/register:
     post:
       tags: [JININFRA]
-      operationId: registerJininfraTopology
-      summary: 진인프라 장비와 프록시 이전 통신 구성 등록
+      operationId: registerJininfraDevices
+      summary: 진인프라 장비 UUID 매핑 확인 및 캐시 적재
       description: |
-        RTK 단말, LPWA 게이트웨이·기준국, 네트워크 제어기, 백홀 장비와 링크를 일괄 등록한다.
-        TOBE 프록시는 모든 vendorDeviceId를 DB에서 조회하고 통합 assetId를 반환한다.
+        RTK 단말, LPWA 게이트웨이·기준국, 네트워크 제어기, 백홀 장비의 UUID 매핑을 일괄 확인한다.
+        장비 연동 서버는 캐시 또는 본 서버 API에서 vendorDeviceId의 통합 assetId를 확인한다.
       requestBody:
         required: true
         content:
@@ -177,22 +175,6 @@ paths:
             application/json:
               schema: {$ref: "#/components/schemas/HealthResponse"}
 
-  /tobe/health:
-    get:
-      tags: [TOBE]
-      operationId: getTobeDependencyHealth
-      summary: 투비 수신 서버와 DB 상태 진단
-      description: |
-        투비 프록시와 Supabase 연결 상태만 확인한다. 외부 장비나 서비스를 호출하지 않는다.
-      parameters:
-        - $ref: "#/components/parameters/HealthMode"
-      responses:
-        "200":
-          description: 상태 조회 성공
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/HealthResponse"}
-
 components:
   parameters:
     HealthMode:
@@ -223,19 +205,19 @@ components:
   schemas:
     NdpsRegisterRequest:
       allOf:
-        - $ref: "#/components/schemas/TopologyRegisterRequest"
+        - $ref: "#/components/schemas/DeviceRegisterRequest"
         - type: object
           properties:
             vendor: {type: string, const: NDPS}
 
     JininfraRegisterRequest:
       allOf:
-        - $ref: "#/components/schemas/TopologyRegisterRequest"
+        - $ref: "#/components/schemas/DeviceRegisterRequest"
         - type: object
           properties:
             vendor: {type: string, const: JININFRA}
 
-    TopologyRegisterRequest:
+    DeviceRegisterRequest:
       type: object
       required: [vendor, reportedByDeviceId, observedAt, devices]
       properties:
@@ -244,7 +226,6 @@ components:
           type: string
           description: 이 요청을 생성한 NMS·제어기·연동 프로그램의 업체 장비번호
         observedAt: {type: string, format: date-time}
-        topologyVersion: {type: [string, "null"]}
         devices:
           type: array
           minItems: 1
@@ -273,23 +254,6 @@ components:
         serialNumber: {type: [string, "null"]}
         modelName: {type: [string, "null"]}
         firmwareVersion: {type: [string, "null"]}
-        connectedTo:
-          oneOf:
-            - $ref: "#/components/schemas/DeviceConnection"
-            - type: "null"
-          description: 이 장비가 데이터를 전달하는 상위 장비. 최상위 NMS·게이트웨이는 null 또는 생략한다.
-        attributes: {type: object, additionalProperties: true}
-
-    DeviceConnection:
-      type: object
-      required: [vendorDeviceId, medium, evidenceType]
-      properties:
-        vendorDeviceId:
-          type: string
-          description: 연결 대상이며 같은 devices 배열에 포함되어야 하는 업체 장비번호
-        medium: {$ref: "#/components/schemas/CommunicationMedium"}
-        evidenceType: {$ref: "#/components/schemas/EvidenceType"}
-        bidirectional: {type: boolean, default: true}
         attributes: {type: object, additionalProperties: true}
 
     RegisterResponse:
@@ -308,7 +272,6 @@ components:
             unmappedDeviceIds:
               type: array
               items: {type: string}
-            linksAccepted: {type: integer, minimum: 0}
             checkedAt: {type: string, format: date-time}
 
     DeviceMappingResult:

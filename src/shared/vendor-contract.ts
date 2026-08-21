@@ -6,22 +6,6 @@ export type VendorDevice = {
   serialNumber?: string | null;
   modelName?: string | null;
   firmwareVersion?: string | null;
-  connectedTo?: {
-    vendorDeviceId: string;
-    medium: string;
-    evidenceType: string;
-    bidirectional?: boolean;
-    attributes?: Record<string, unknown>;
-  } | null;
-  attributes?: Record<string, unknown>;
-};
-
-export type DeclaredLink = {
-  fromDeviceId: string;
-  toDeviceId: string;
-  medium: string;
-  evidenceType: string;
-  bidirectional?: boolean;
   attributes?: Record<string, unknown>;
 };
 
@@ -29,20 +13,8 @@ export type RegisterRequest = {
   vendor: Vendor;
   reportedByDeviceId: string;
   observedAt: string;
-  topologyVersion?: string | null;
   devices: VendorDevice[];
 };
-
-export function topologyLinks(request: RegisterRequest): DeclaredLink[] {
-  return request.devices.flatMap((device) => device.connectedTo ? [{
-    fromDeviceId: device.vendorDeviceId,
-    toDeviceId: device.connectedTo.vendorDeviceId,
-    medium: device.connectedTo.medium,
-    evidenceType: device.connectedTo.evidenceType,
-    bidirectional: device.connectedTo.bidirectional,
-    attributes: device.connectedTo.attributes,
-  }] : []);
-}
 
 export type InvokeRequest = {
   payloadType?: string;
