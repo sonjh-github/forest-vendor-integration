@@ -8,14 +8,15 @@
     "build": "tsc -p tsconfig.json",
     "start": "node --env-file-if-exists=.env dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run test:ndps && npm run test:jininfra && npm run test:core-flow",
+    "test": "npm run test:config && npm run test:ndps && npm run test:jininfra && npm run test:core-flow",
+    "test:config": "node --import tsx --test test/config.test.ts",
     "test:ndps": "node --import tsx --test test/ndps.test.ts",
     "test:jininfra": "node --import tsx --test test/jininfra.test.ts",
     "test:core-flow": "node --import tsx --test test/core-flow.test.ts",
     "test:integration": "npm run test:integration:ndps && npm run test:integration:jininfra",
-    "test:integration:ndps": "node --env-file=.env --import tsx scripts/ndps-integration.ts",
-    "test:integration:jininfra": "node --env-file=.env --import tsx scripts/jininfra-integration.ts",
-    "test:integration:core": "node --env-file=.env --import tsx test/core-client.test.ts"
+    "test:integration:ndps": "node --env-file-if-exists=.env --import tsx scripts/ndps-integration.ts",
+    "test:integration:jininfra": "node --env-file-if-exists=.env --import tsx scripts/jininfra-integration.ts",
+    "test:integration:core": "node --env-file-if-exists=.env --import tsx test/core-client.test.ts"
   },
   "dependencies": {
     "@hono/node-server": "2.0.11",

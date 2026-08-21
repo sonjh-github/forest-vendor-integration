@@ -29,7 +29,7 @@ GET  /{vendor}/health
 
 ## 환경변수
 
-`.env.example`을 `.env`로 복사해 설정한다. Supabase URL이나 secret key는 이 서버에 설정하지 않는다.
+`.env` 없이 실행하면 배포된 본 서버 `https://api.forest.tobeunicorn.kr`에 연결한다. 로컬 Core나 Docker 내부 Core를 사용할 때만 `CORE_SERVER_URL`을 재정의한다. Supabase URL이나 secret key는 이 서버에 설정하지 않는다.
 
 ## 실행 및 검증
 
