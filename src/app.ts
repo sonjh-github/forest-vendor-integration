@@ -6,6 +6,10 @@ import { ndpsRoutes } from "./ndps/routes.js";
 
 export const app = new Hono();
 
+export function isDockerHealthCheck(method: string, pathname: string, marker?: string): boolean {
+  return method === "GET" && pathname === "/" && marker === "docker";
+}
+
 // ==========================================
 // [헬퍼 함수] 로그 출력용 한국 시간(KST) 포맷터
 // 서버 / Docker timezone은 변경하지 않음
@@ -103,6 +107,10 @@ app.use("*", async (c, next) => {
 
   // 실제 라우터 / 미들웨어 실행
   await next();
+
+  // Docker가 전용 헤더와 함께 보내는 내부 헬스체크는 접근 로그에서 제외한다.
+  // 일반 사용자의 GET / 요청은 동일하게 기록된다.
+  if (isDockerHealthCheck(method, new URL(url).pathname, c.req.header("x-health-check"))) return;
 
   // ------------------------------------------
   // 2. Response Body 파싱
