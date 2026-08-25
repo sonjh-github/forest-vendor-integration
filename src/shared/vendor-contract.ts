@@ -3,7 +3,6 @@ import type { Vendor } from "../types.js";
 export type VendorDevice = {
   vendorDeviceId: string;
   deviceType: string;
-  serialNumber?: string | null;
   modelName?: string | null;
   firmwareVersion?: string | null;
   attributes?: Record<string, unknown>;
