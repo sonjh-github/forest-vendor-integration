@@ -1,10 +1,24 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { appendFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { jininfraRoutes } from "./jininfra/routes.js";
 import { ndpsRoutes } from "./ndps/routes.js";
 
 export const app = new Hono();
+
+const browserCors = cors({
+  origin: [
+      "http://127.0.0.1:15173",
+      "http://localhost:15173",
+      "https://wildfire.forest.tobeunicorn.kr",
+    ],
+  allowMethods: ["GET", "POST", "OPTIONS"],
+  allowHeaders: ["Content-Type", "Authorization"],
+});
+
+app.use("/jininfra/*", browserCors);
+app.use("/ndps/*", browserCors);
 
 export function isDockerHealthCheck(method: string, pathname: string, marker?: string): boolean {
   return method === "GET" && pathname === "/" && marker === "docker";
