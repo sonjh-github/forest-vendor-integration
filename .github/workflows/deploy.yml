@@ -45,9 +45,6 @@ jobs:
             # .env가 없으면 배포 중단
             test -f .env
 
-            # 영구 로그 디렉터리
-            mkdir -p /home/ubuntu/logs/forest-vendor-integration
-
             # core와 통신하는 공용 사설 네트워크
             docker network inspect forest-backend >/dev/null 2>&1 || \
               docker network create forest-backend
@@ -67,7 +64,6 @@ jobs:
               --env-file /home/ubuntu/server/forest-vendor-integration/.env \
               -e CORE_SERVER_URL=http://forest-core-server:18020 \
               -p 127.0.0.1:18010:18010 \
-              -v /home/ubuntu/logs/forest-vendor-integration:/app/logs \
               forest-vendor-integration
 
             docker ps \

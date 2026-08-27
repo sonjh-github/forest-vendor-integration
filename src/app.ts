@@ -1,7 +1,6 @@
 import { Hono } from "hono";
-import { appendFile, mkdir } from "node:fs/promises";
-import { join } from "node:path";
 import { jininfraRoutes } from "./jininfra/routes.js";
+import { classifyRequest, googleSheetLogForwarder } from "./logging/google-sheet.js";
 import { ndpsRoutes } from "./ndps/routes.js";
 
 export const app = new Hono();
@@ -14,10 +13,7 @@ export function isDockerHealthCheck(method: string, pathname: string, marker?: s
 // [헬퍼 함수] 로그 출력용 한국 시간(KST) 포맷터
 // 서버 / Docker timezone은 변경하지 않음
 // ==========================================
-function getKstTime(): {
-  timestamp: string;
-  dateOnly: string;
-} {
+function getKstTimestamp(): string {
   const now = new Date();
 
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -43,37 +39,7 @@ function getKstTime(): {
 
   const milliseconds = String(now.getMilliseconds()).padStart(3, "0");
 
-  return {
-    dateOnly: `${year}-${month}-${day}`,
-    timestamp: `${year}-${month}-${day} ${hour}:${minute}:${second}.${milliseconds}`,
-  };
-}
-
-// ==========================================
-// [헬퍼 함수] 파일에 로그 기록
-// ==========================================
-async function saveLogToFile(
-  logData: object,
-  dateOnly: string,
-): Promise<void> {
-  try {
-    const logDir = join(process.cwd(), "logs");
-
-    await mkdir(logDir, {
-      recursive: true,
-    });
-
-    // 한국 날짜 기준 파일 생성
-    // 예: logs/2026-08-20.log
-    const filePath = join(logDir, `${dateOnly}.log`);
-
-    // JSON Lines 형식
-    const logLine = `${JSON.stringify(logData)}\n`;
-
-    await appendFile(filePath, logLine, "utf-8");
-  } catch (error) {
-    console.error("로그 파일 저장 실패:", error);
-  }
+  return `${year}-${month}-${day} ${hour}:${minute}:${second}.${milliseconds}`;
 }
 
 // ==========================================
@@ -136,7 +102,7 @@ app.use("*", async (c, next) => {
   // ------------------------------------------
   // 3. 한국 시간 기준 로그 생성
   // ------------------------------------------
-  const { timestamp, dateOnly } = getKstTime();
+  const timestamp = getKstTimestamp();
 
   const logData = {
     timestamp,
@@ -166,8 +132,18 @@ app.use("*", async (c, next) => {
   // Docker stdout 로그
   console.log(JSON.stringify(logData));
 
-  // 날짜별 파일 로그
-  void saveLogToFile(logData, dateOnly);
+  // 외부 로그 적재는 응답 처리와 분리된 큐에서 비동기로 수행한다.
+  googleSheetLogForwarder.enqueue({
+    timestamp,
+    method,
+    url,
+    status: res.status,
+    "구분": classifyRequest(method, url),
+    durationMs: duration,
+    "user-agent": c.req.header("user-agent") ?? null,
+    "request.body": reqBody,
+    "response.body": resBody,
+  });
 });
 
 // ==========================================
