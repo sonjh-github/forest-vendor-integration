@@ -24,8 +24,27 @@ GET  /{vendor}/health
 - UUID가 매핑된 장비: 기본 5분
 - 미매핑 장비(negative cache): 기본 30초
 - 캐시는 프로세스 메모리에 있으며 재시작하면 비워진다.
-- register는 장비 매핑만 확인하며 토폴로지를 저장하지 않는다.
+- register는 Core의 `vendor + vendorDeviceId` 매핑을 확인하고 캐시에 적재한다.
+- 매핑이 없으면 현재 Core는 기존 업체 호환을 위해 `asset_code = vendorDeviceId`인 기존 자산을 찾아 매핑할 수 있다.
+- register는 신규 자산이나 UUID를 생성하지 않는다.
+- 미연결 장비는 `UNMAPPED`로 반환한다.
+- 토폴로지는 저장하지 않는다.
 - 수신 메시지는 항상 본 서버로 한 번만 전달한다.
+
+## 요청 로그 확인
+
+일반 요청의 요청·응답 로그는 처리 응답과 분리된 비동기 큐를 통해 [장비 요청 로그 Google Sheet](https://docs.google.com/spreadsheets/d/1-EFs-PZX5w6QbitYZZRa7cpWXpVCXRDy6PFpEkE8umw/edit?usp=sharing)에 적재한다.
+
+```text
+timestamp | method | url | status | 구분 | durationMs | user-agent | request.body | response.body
+```
+
+- 테스트 요청은 고유한 `User-Agent`를 지정하면 시트에서 쉽게 검색할 수 있다.
+- `구분`은 `REGISTER`, `VALIDATE_ONLY`, `DELIVER`, `HEALTH`, `OTHER` 중 하나이며 E열에 기록된다.
+- Docker 전용 `GET /` 헬스체크는 기록하지 않으며 일반 사용자의 `GET /` 요청은 기록한다.
+- 날짜별 로그 파일은 생성하지 않는다.
+- 외부 시트 전송이 실패하거나 제한 시간을 초과해도 장비 API 응답에는 영향을 주지 않는다.
+- 서버의 실시간 stdout 로그는 `docker logs --tail 100 forest-vendor-integration`으로 확인한다.
 
 ## 환경변수
 
