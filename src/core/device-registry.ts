@@ -7,7 +7,7 @@ import type { ExternalVendor, MappingResult } from "./types.js";
 function normalizeIds(value: unknown, ids: Map<string, string>, key?: string): unknown {
   const scalarKeys = new Set(["reportedByDeviceId", "sourceDeviceId", "fromDeviceId", "toDeviceId", "gatewayDeviceId", "baseDeviceId", "cpeDeviceId", "terminalDeviceId", "baseStationDeviceId"]);
   if (typeof value === "string" && key && scalarKeys.has(key)) return ids.get(value) ?? value;
-  if (Array.isArray(value)) return value.map((item) => key === "receivedTerminalDeviceIds" && typeof item === "string" ? ids.get(item) ?? item : normalizeIds(item, ids));
+  if (Array.isArray(value)) return value.map((item) => (key === "relatedDeviceIds" || key === "receivedTerminalDeviceIds") && typeof item === "string" ? ids.get(item) ?? item : normalizeIds(item, ids));
   if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([childKey, item]) => [childKey, normalizeIds(item, ids, childKey)]));
   return value;
 }

@@ -6,7 +6,7 @@ process.env.CORE_REQUEST_TIMEOUT_MS = "1000";
 
 const request = {
   context: { eventExternalId: "E-1", sourceSystem: "ndps", occurredAt: "2026-08-21T00:00:00.000Z", sourceDeviceId: "CPE-1", reportedByDeviceId: "NMS-1" },
-  activePath: [{ sequence: 1, fromDeviceId: "CPE-1", toDeviceId: "BASE-1", medium: "TVWS", evidenceType: "OBSERVED" }],
+  activePath: [{ sequence: 1, fromDeviceId: "CPE-1", toDeviceId: "BASE-1", medium: "TVWS", evidenceType: "OBSERVED", observations: [{ receivedAt: "2026-08-21T00:00:00.000Z", rssiDbm: -71 }] }],
   data: { baseDeviceId: "BASE-1", cpeDeviceId: "CPE-1", observedAt: "2026-08-21T00:00:00.000Z", operationalStatus: "ONLINE" },
 };
 
@@ -18,15 +18,15 @@ test("invoke는 캐시 MISS/HIT 모두 core에 HTTP 요청을 한 번만 보낸�
     return new Response(JSON.stringify({ data: { accepted: true, mapping: { allMapped: true, mappedDevices: mappings, unmappedDeviceIds: [] }, persisted: true } }), { status: 200, headers: { "content-type": "application/json" } });
   };
 
-  const { invokeNdps } = await import("../src/ndps/integration.js");
+  const { invoke } = await import("../src/shared/integration.js");
   const { clearMappingCache } = await import("../src/core/mapping-cache.js");
   clearMappingCache();
 
-  await invokeNdps(request, "DELIVER");
+  await invoke("NDPS", request, "DELIVER");
   assert.equal(requestBodies.length, 1);
   assert.equal(requestBodies[0]?.normalized, false);
 
-  await invokeNdps(request, "DELIVER");
+  await invoke("NDPS", request, "DELIVER");
   assert.equal(requestBodies.length, 2);
   assert.equal(requestBodies[1]?.normalized, true);
   assert.equal((requestBodies[1]?.request as typeof request).context.sourceDeviceId, mappings[0]?.assetId);

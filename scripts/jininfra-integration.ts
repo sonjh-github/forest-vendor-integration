@@ -4,7 +4,7 @@ import { app } from "../src/app.js";
 
 const observedAt = new Date().toISOString();
 const register = {
-  vendor: "JININFRA", reportedByDeviceId: "SIM-RTK-BASE-01", observedAt,
+  vendor: "JININFRA", sourceDeviceId: "SIM-RTK-BASE-01", reportedByDeviceId: "SIM-RTK-BASE-01", observedAt,
   devices: [
     { vendorDeviceId: "SIM-RTK-BASE-01", deviceType: "RTK_LPWA_GATEWAY" },
     { vendorDeviceId: "SIM-RTK-01", deviceType: "RTK_TERMINAL" },
@@ -13,7 +13,7 @@ const register = {
 const invoke = {
   payloadType: "RTK_LPWA_GATEWAY",
   context: { eventExternalId: "TEST-JININFRA", sourceSystem: "jininfra-test", occurredAt: observedAt, sourceDeviceId: "SIM-RTK-BASE-01", reportedByDeviceId: "SIM-RTK-BASE-01" },
-  activePath: [],
+  activePath: [{ sequence: 1, fromDeviceId: "SIM-RTK-01", toDeviceId: "SIM-RTK-BASE-01", medium: "LPWA", evidenceType: "OBSERVED", observations: [{ receivedAt: observedAt, rssiDbm: -76, snrDb: 13.2, selected: true }] }],
   data: { gatewayDeviceId: "SIM-RTK-BASE-01", observedAt, operationalStatus: "ONLINE", rtcmAvailable: true, connectedTerminals: 1, receivedTerminalDeviceIds: ["SIM-RTK-01"] },
 };
 
@@ -46,7 +46,7 @@ assert.equal(healthResponse.status, 200);
 assert.equal(healthBody.data?.databaseStatus, "REACHABLE");
 
 const unknownId = `JININFRA-UNMAPPED-${Date.now()}`;
-const unmappedRegisterResponse = await app.request("/jininfra/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ vendor: "JININFRA", reportedByDeviceId: unknownId, observedAt, devices: [{ vendorDeviceId: unknownId, deviceType: "RTK_LPWA_GATEWAY" }] }) });
+const unmappedRegisterResponse = await app.request("/jininfra/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ vendor: "JININFRA", sourceDeviceId: unknownId, reportedByDeviceId: unknownId, observedAt, devices: [{ vendorDeviceId: unknownId, deviceType: "RTK_LPWA_GATEWAY" }] }) });
 const unmappedRegisterBody = await unmappedRegisterResponse.json() as { data?: { registrationStatus?: string; unmappedDeviceIds?: string[] } };
 assert.equal(unmappedRegisterResponse.status, 207);
 assert.equal(unmappedRegisterBody.data?.registrationStatus, "UNMAPPED");

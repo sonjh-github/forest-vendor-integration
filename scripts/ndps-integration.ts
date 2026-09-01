@@ -4,7 +4,7 @@ import { app } from "../src/app.js";
 
 const observedAt = new Date().toISOString();
 const register = {
-  vendor: "NDPS", reportedByDeviceId: "SIM-COMMAND-01", observedAt,
+  vendor: "NDPS", sourceDeviceId: "SIM-TVWS-CPE-01", reportedByDeviceId: "SIM-COMMAND-01", observedAt,
   devices: [
     { vendorDeviceId: "SIM-TVWS-BS-01", deviceType: "TVWS_BASE" },
     { vendorDeviceId: "SIM-TVWS-CPE-01", deviceType: "TVWS_CPE" },
@@ -13,7 +13,7 @@ const register = {
 };
 const invoke = {
   context: { eventExternalId: "TEST-NDPS", sourceSystem: "ndps-test", occurredAt: observedAt, sourceDeviceId: "SIM-TVWS-CPE-01", reportedByDeviceId: "SIM-COMMAND-01" },
-  activePath: [{ sequence: 1, fromDeviceId: "SIM-TVWS-CPE-01", toDeviceId: "SIM-TVWS-BS-01", medium: "TVWS", evidenceType: "OBSERVED" }],
+  activePath: [{ sequence: 1, fromDeviceId: "SIM-TVWS-CPE-01", toDeviceId: "SIM-TVWS-BS-01", medium: "TVWS", evidenceType: "OBSERVED", observations: [{ receivedAt: observedAt, rssiDbm: -71, snrDb: 18.5, selected: true }] }],
   data: { baseDeviceId: "SIM-TVWS-BS-01", cpeDeviceId: "SIM-TVWS-CPE-01", observedAt, operationalStatus: "ONLINE" },
 };
 
@@ -46,7 +46,7 @@ assert.equal(healthResponse.status, 200);
 assert.equal(healthBody.data?.databaseStatus, "REACHABLE");
 
 const unknownId = `NDPS-UNMAPPED-${Date.now()}`;
-const unmappedRegisterResponse = await app.request("/ndps/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ vendor: "NDPS", reportedByDeviceId: unknownId, observedAt, devices: [{ vendorDeviceId: unknownId, deviceType: "TVWS_NMS" }] }) });
+const unmappedRegisterResponse = await app.request("/ndps/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ vendor: "NDPS", sourceDeviceId: unknownId, reportedByDeviceId: unknownId, observedAt, devices: [{ vendorDeviceId: unknownId, deviceType: "TVWS_NMS" }] }) });
 const unmappedRegisterBody = await unmappedRegisterResponse.json() as { data?: { registrationStatus?: string; unmappedDeviceIds?: string[] } };
 assert.equal(unmappedRegisterResponse.status, 207);
 assert.equal(unmappedRegisterBody.data?.registrationStatus, "UNMAPPED");

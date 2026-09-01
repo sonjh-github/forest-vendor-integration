@@ -44,7 +44,7 @@ export class GoogleSheetLogForwarder {
     private readonly endpoint = GOOGLE_SHEET_LOG_URL,
     private readonly requestTimeoutMs = 3_000,
     private readonly maxQueueSize = 1_000,
-    private readonly fetcher: FetchLike = fetch,
+    private readonly fetcher: FetchLike = (input, init) => fetch(input, init),
   ) {}
 
   enqueue(row: GoogleSheetLogRow): void {
