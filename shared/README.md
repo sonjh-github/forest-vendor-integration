@@ -7,7 +7,7 @@
 - 프록시 요청 주체 `reportedByDeviceId`
 - 장비 간 링크 `fromDeviceId`, `toDeviceId`, `medium`
 - 요청별 프록시 이전 경로 `activePath`
-- 실제 수신 관측 `observations`
+- 각 경로 구간의 실제 수신 관측 `activePath[].observations`
 - 경로 근거 `OBSERVED`, `DECLARED`, `INFERRED`, `UNKNOWN`
 - 중복 처리용 `requestId`, `Idempotency-Key`
 
