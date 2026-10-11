@@ -31,3 +31,29 @@ test("invoke는 캐시 MISS/HIT 모두 core에 HTTP 요청을 한 번만 보낸�
   assert.equal(requestBodies[1]?.normalized, true);
   assert.equal((requestBodies[1]?.request as typeof request).context.sourceDeviceId, mappings[0]?.assetId);
 });
+
+test("invoke refreshes cached unmapped devices after Core registration", async () => {
+  const { invoke } = await import("../src/shared/integration.js");
+  const { clearMappingCache, writeMappings } = await import("../src/core/mapping-cache.js");
+  clearMappingCache();
+  const ids = ["CPE-1", "NMS-1", "BASE-1"];
+  writeMappings("NDPS", ids.map(vendorDeviceId => ({ vendorDeviceId, assetId: null, mapped: false, assetExists: false, mappingStatus: "UNMAPPED" })));
+  const calls: Record<string, unknown>[] = [];
+  const mapped = ids.map((vendorDeviceId, index) => ({vendorDeviceId,assetId:`00000000-0000-4000-8000-00000000000${index}`,mapped:true,assetExists:true,mappingStatus:"ACTIVE"}));
+  const original = globalThis.fetch;
+  globalThis.fetch = async (_input, init) => {
+    calls.push(JSON.parse(String(init?.body)));
+    return new Response(JSON.stringify({ data: { accepted: true, mapping: { mappedDevices: mapped, unmappedDeviceIds: [] }, persisted: false } }), {status:200});
+  };
+  try {
+    const first = await invoke("NDPS", request, "VALIDATE_ONLY");
+    assert.equal(first.accepted, true);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].normalized, false);
+    assert.deepEqual(calls[0].mappings, []);
+    assert.equal((calls[0].request as typeof request).context.sourceDeviceId, "CPE-1");
+    await invoke("NDPS", request, "VALIDATE_ONLY");
+    assert.equal(calls.length, 2);
+    assert.equal(calls[1].normalized, true);
+  } finally { globalThis.fetch = original; clearMappingCache(); }
+});
