@@ -42,7 +42,7 @@ export class GoogleSheetLogForwarder {
 
   constructor(
     private readonly endpoint = GOOGLE_SHEET_LOG_URL,
-    private readonly requestTimeoutMs = 3_000,
+    private readonly requestTimeoutMs = 30_000,
     private readonly maxQueueSize = 1_000,
     private readonly fetcher: FetchLike = (input, init) => fetch(input, init),
   ) {}
@@ -72,8 +72,9 @@ export class GoogleSheetLogForwarder {
           body: JSON.stringify(row),
           signal: AbortSignal.timeout(this.requestTimeoutMs),
         });
-        if (!response.ok) {
-          console.error(`Google Sheet 로그 전송 실패: HTTP ${response.status}`);
+        const body = await response.text();
+        if (!response.ok || /^\s*</.test(body)) {
+          throw new Error(`HTTP ${response.status}: ${body.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").slice(-1_000)}`);
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

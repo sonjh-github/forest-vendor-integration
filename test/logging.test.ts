@@ -59,3 +59,22 @@ test("Google Sheet 로그는 요청 응답과 분리된 큐에서 지정된 열 
     "response.body": { status: "MAPPED" },
   });
 });
+
+
+test("HTTP 200이어도 Apps Script HTML 오류를 전송 실패로 기록한다", async () => {
+  const originalError = console.error;
+  const errors: string[] = [];
+  console.error = (message: unknown) => { errors.push(String(message)); };
+  try {
+    const forwarder = new GoogleSheetLogForwarder("https://example.test/log", 1_000, 10,
+      async () => new Response("<!DOCTYPE html><p>Script error: permission denied</p>", { status: 200 }));
+    forwarder.enqueue({ timestamp: "2026-10-12 15:00:00", method: "GET", url: "https://device.example/",
+      status: 200, "구분": "HEALTH", durationMs: 1, "user-agent": "test", "request.body": null, "response.body": null });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(errors.length, 1);
+    assert.match(errors[0]!, /Google Sheet 로그 전송 실패: HTTP 200/);
+    assert.match(errors[0]!, /permission denied/);
+  } finally {
+    console.error = originalError;
+  }
+});
