@@ -53,6 +53,9 @@ jobs:
               -f dockerfile \
               -t forest-vendor-integration .
 
+            mkdir -p /home/ubuntu/server/forest-vendor-integration/data
+            sudo chown 1000:1000 /home/ubuntu/server/forest-vendor-integration/data
+
             docker rm -f forest-vendor-integration || true
 
             docker run -d \
@@ -63,6 +66,7 @@ jobs:
               --log-opt max-file=5 \
               --env-file /home/ubuntu/server/forest-vendor-integration/.env \
               -e CORE_SERVER_URL=http://forest-core-server:18020 \
+              -v /home/ubuntu/server/forest-vendor-integration/data:/app/data \
               -p 127.0.0.1:18010:18010 \
               forest-vendor-integration
 
