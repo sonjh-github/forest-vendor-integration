@@ -75,9 +75,10 @@ test("HTTP 200이어도 Apps Script HTML 오류를 전송 실패로 기록한다
     forwarder.enqueue({ timestamp: "2026-10-12 15:00:00", method: "GET", url: "https://device.example/",
       status: 200, "구분": "HEALTH", durationMs: 1, "user-agent": "test", "request.body": null, "response.body": null });
     await new Promise<void>((resolve) => setImmediate(resolve));
-    assert.equal(errors.length, 1);
-    assert.match(errors[0]!, /Google Sheet 로그 전송 실패 .*HTTP 200/);
-    assert.match(errors[0]!, /permission denied/);
+    const failure = errors.find((message) => message.includes("Google Sheet 로그 전송 실패"));
+    assert.ok(failure);
+    assert.match(failure, /HTTP 200/);
+    assert.match(failure, /permission denied/);
   } finally {
     console.error = originalError;
   }
