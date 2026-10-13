@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { classifyRequest, googleSheetLogForwarder } from "./logging/google-sheet.js";
+// import { classifyRequest, googleSheetLogForwarder } from "./logging/google-sheet.js";
 import { vendorRoutes } from "./shared/routes.js";
 
 export const app = new Hono();
@@ -131,18 +131,18 @@ app.use("*", async (c, next) => {
   // Docker stdout 로그
   console.log(JSON.stringify(logData));
 
-  // 외부 로그 적재는 응답 처리와 분리된 큐에서 비동기로 수행한다.
-  googleSheetLogForwarder.enqueue({
-    timestamp,
-    method,
-    url,
-    status: res.status,
-    "구분": classifyRequest(method, url),
-    durationMs: duration,
-    "user-agent": c.req.header("user-agent") ?? null,
-    "request.body": reqBody,
-    "response.body": resBody,
-  });
+  // 사용자 요청으로 시트 로그 전송 중지. import도 중지해 기존 큐 자동 전송을 막는다.
+  // googleSheetLogForwarder.enqueue({
+  // timestamp,
+  // method,
+  // url,
+  // status: res.status,
+  // "구분": classifyRequest(method, url),
+  // durationMs: duration,
+  // "user-agent": c.req.header("user-agent") ?? null,
+  // "request.body": reqBody,
+  // "response.body": resBody,
+  // });
 });
 
 // ==========================================
