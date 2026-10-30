@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
+import { DatabaseSync } from "node:sqlite";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { isDockerHealthCheck } from "../src/app.js";
@@ -114,6 +115,32 @@ test("몰린 로그를 동시 처리하고 전송 실패한 행을 재시도한�
     assert.equal(attempts.get("row-0"), 2);
     assert.ok(errors.some((message) => message.includes("HTTP 503")));
   } finally { console.error = originalError; }
+});
+
+test("재시작 후 쌓인 로그보다 최신 요청을 먼저 시트에 전송한다", () => {
+  const directory = mkdtempSync(join(tmpdir(), "forest-log-priority-"));
+  const databasePath = join(directory, "queue.sqlite");
+  try {
+    const db = new DatabaseSync(databasePath);
+    db.exec(`CREATE TABLE pending_log (id INTEGER PRIMARY KEY AUTOINCREMENT, row_json TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at INTEGER NOT NULL DEFAULT 0)`);
+    const insert = db.prepare("INSERT INTO pending_log(row_json) VALUES(?)");
+    for (let i = 0; i < 5; i++) insert.run(JSON.stringify({ timestamp: `old-${i}` }));
+    db.close();
+
+    const run = `import { GoogleSheetLogForwarder } from './src/logging/google-sheet.ts';
+      const queue = new GoogleSheetLogForwarder('https://example.test/log', 1000, 1,
+        async (_input, init) => { console.log(JSON.parse(init.body).timestamp); return new Response('ok'); },
+        ${JSON.stringify(databasePath)});
+      queue.enqueue({ timestamp: 'new', method: 'GET', url: 'https://device.example/',
+        status: 200, '구분': 'HEALTH', durationMs: 1, 'user-agent': 'test',
+        'request.body': null, 'response.body': null });
+      setTimeout(() => process.exit(0), 200);`;
+    const result = spawnSync(process.execPath, ['--import', 'tsx', '--input-type=module'],
+      { input: run, encoding: 'utf8', timeout: 10_000 });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout.trim().split(/\r?\n/)[0], 'new');
+  } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
 

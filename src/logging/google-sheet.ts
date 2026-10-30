@@ -72,7 +72,8 @@ export class GoogleSheetLogForwarder {
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
     while (this.active < this.concurrency) {
-      const row = this.db.prepare("SELECT * FROM pending_log WHERE next_attempt_at<=? ORDER BY id LIMIT 1")
+      // Keep the current operational view fresh while draining historical backlog.
+      const row = this.db.prepare("SELECT * FROM pending_log WHERE next_attempt_at<=? ORDER BY id DESC LIMIT 1")
         .get(Date.now()) as { id: number; row_json: string; attempts: number } | undefined;
       if (!row) break;
       // Lease survives a restart; only acknowledged writes are removed.
