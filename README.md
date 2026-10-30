@@ -34,6 +34,7 @@ GET  /{vendor}/health
 ## 요청 로그 확인
 
 일반 요청의 요청·응답 로그는 처리 응답과 분리된 비동기 큐를 통해 [장비 요청 로그 Google Sheet](https://docs.google.com/spreadsheets/d/1-EFs-PZX5w6QbitYZZRa7cpWXpVCXRDy6PFpEkE8umw/edit?usp=sharing)에 적재한다.
+동일한 로그는 별도 영속 큐를 통해 Core SQLite에도 전달하며, 산불 대시보드의 장비 관리 화면에서 조회한다.
 
 ```text
 timestamp | method | url | status | 구분 | durationMs | user-agent | request.body | response.body

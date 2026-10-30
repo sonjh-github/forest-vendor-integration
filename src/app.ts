@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { classifyRequest, googleSheetLogForwarder } from "./logging/google-sheet.js";
+import { classifyRequest, coreDbLogForwarder, googleSheetLogForwarder } from "./logging/google-sheet.js";
 import { vendorRoutes } from "./shared/routes.js";
 
 export const app = new Hono();
@@ -133,7 +133,7 @@ app.use("*", async (c, next) => {
 
   // API 응답과 분리된 영속 큐에 적재한다. Core 장애나 시트 장애가
   // 장비 요청 응답을 지연시키지 않으며, 실패한 로그는 재시도한다.
-  googleSheetLogForwarder.enqueue({
+  const forwardingRow = {
     timestamp,
     method,
     url,
@@ -143,7 +143,10 @@ app.use("*", async (c, next) => {
     "user-agent": c.req.header("user-agent") ?? null,
     "request.body": reqBody,
     "response.body": resBody,
-  });
+  };
+
+  googleSheetLogForwarder.enqueue(forwardingRow);
+  coreDbLogForwarder.enqueue(forwardingRow);
 });
 
 // ==========================================

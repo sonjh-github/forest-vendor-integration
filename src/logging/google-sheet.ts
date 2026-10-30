@@ -1,4 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
+import { config } from "../config.js";
 
 export const GOOGLE_SHEET_LOG_URL = "https://script.google.com/macros/s/AKfycbwz8xbmTsbBzVz5Pc_r08QcF5gs6wTPXAUZn_X5ikyeJBQwKGoMqNc4SNmgrqg0k9NfcQ/exec";
 
@@ -118,4 +119,12 @@ export class GoogleSheetLogForwarder {
 export const googleSheetLogForwarder = new GoogleSheetLogForwarder(
   GOOGLE_SHEET_LOG_URL, 30_000, 8, undefined,
   process.env.NODE_ENV === "production" ? "/app/data/log-queue.sqlite" : ":memory:",
+);
+
+export const coreDbLogForwarder = new GoogleSheetLogForwarder(
+  `${config.coreServerUrl}/internal/v1/vendor-request-logs`,
+  config.coreRequestTimeoutMs,
+  4,
+  undefined,
+  process.env.NODE_ENV === "production" ? "/app/data/core-log-queue.sqlite" : ":memory:",
 );
