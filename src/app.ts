@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { classifyRequest, coreDbLogForwarder, googleSheetLogForwarder } from "./logging/google-sheet.js";
+import { classifyRequest, coreDbLogForwarder } from "./logging/google-sheet.js";
 import { vendorRoutes } from "./shared/routes.js";
 
 export const app = new Hono();
@@ -145,7 +145,8 @@ app.use("*", async (c, next) => {
     "response.body": resBody,
   };
 
-  googleSheetLogForwarder.enqueue(forwardingRow);
+  // Excel/Google Sheet forwarding disabled at the operator's request.
+  // googleSheetLogForwarder.enqueue(forwardingRow);
   coreDbLogForwarder.enqueue(forwardingRow);
 });
 

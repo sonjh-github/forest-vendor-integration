@@ -58,6 +58,23 @@ jobs:
 
             docker rm -f forest-vendor-integration || true
 
+            # Clear only the disabled Excel forwarding queue after its worker stops.
+            python3 - <<'PY'
+            import pathlib, sqlite3
+            path = pathlib.Path('/home/ubuntu/server/forest-vendor-integration/data/log-queue.sqlite')
+            if path.is_file():
+                with sqlite3.connect(path, timeout=10) as db:
+                    exists = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='pending_log'").fetchone()
+                    if exists:
+                        deleted = db.execute('DELETE FROM pending_log').rowcount
+                        db.commit()
+                        remaining = db.execute('SELECT COUNT(*) FROM pending_log').fetchone()[0]
+                        assert remaining == 0
+                        print(f'Excel queue cleared: deleted={deleted}, remaining={remaining}')
+            else:
+                print('Excel queue absent; forwarding disabled')
+            PY
+
             docker run -d \
               --name forest-vendor-integration \
               --restart unless-stopped \

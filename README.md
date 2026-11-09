@@ -33,20 +33,17 @@ GET  /{vendor}/health
 
 ## 요청 로그 확인
 
-일반 요청의 요청·응답 로그는 처리 응답과 분리된 비동기 큐를 통해 [장비 요청 로그 Google Sheet](https://docs.google.com/spreadsheets/d/1-EFs-PZX5w6QbitYZZRa7cpWXpVCXRDy6PFpEkE8umw/edit?usp=sharing)에 적재한다.
-동일한 로그는 별도 영속 큐를 통해 Core SQLite에도 전달하며, 산불 대시보드의 장비 관리 화면에서 조회한다.
+엑셀(Google Sheet) 로그 전송은 운영 요청으로 중단했다. 전송 호출과 큐 작업자 생성을 주석 처리했으며, 배포 시 기존 엑셀 대기 큐만 비운다.
+일반 요청의 요청·응답 로그는 별도 영속 큐를 통해 Core SQLite에 전달하며, 산불 대시보드의 장비 관리 화면에서 조회한다.
 
 ```text
 timestamp | method | url | status | 구분 | durationMs | user-agent | request.body | response.body
 ```
 
-- 테스트 요청은 고유한 `User-Agent`를 지정하면 시트에서 쉽게 검색할 수 있다.
-- `구분`은 `REGISTER`, `VALIDATE_ONLY`, `DELIVER`, `HEALTH`, `OTHER` 중 하나이며 E열에 기록된다.
+- `구분`은 `REGISTER`, `VALIDATE_ONLY`, `DELIVER`, `HEALTH`, `OTHER` 중 하나다.
 - Docker 전용 `GET /` 헬스체크는 기록하지 않으며 일반 사용자의 `GET /` 요청은 기록한다.
 - 날짜별 로그 파일은 생성하지 않는다.
-- 운영 환경의 대기 로그는 `/app/data/log-queue.sqlite`에 보관하며 컨테이너 재시작 후에도 재전송한다.
-- 최대 8건을 동시에 전송하고, 전송 실패 시 최대 60초 간격으로 재시도한다. 시트 수신 후에만 대기 로그를 삭제한다.
-- 외부 시트 전송이 실패하거나 제한 시간을 초과해도 장비 API 응답에는 영향을 주지 않는다.
+- Core 전달 대기 로그는 `/app/data/core-log-queue.sqlite`에 보관하며 컨테이너 재시작 후에도 재전송한다.
 - 서버의 실시간 stdout 로그는 `docker logs --tail 100 forest-vendor-integration`으로 확인한다.
 
 ## 환경변수

@@ -117,10 +117,11 @@ export class GoogleSheetLogForwarder {
   }
 }
 
-export const googleSheetLogForwarder = new GoogleSheetLogForwarder(
-  GOOGLE_SHEET_LOG_URL, 30_000, 8, undefined,
-  process.env.NODE_ENV === "production" ? "/app/data/log-queue.sqlite" : ":memory:",
-);
+// Disabled together with enqueue: importing this module must not resume the Excel queue.
+// export const googleSheetLogForwarder = new GoogleSheetLogForwarder(
+//   GOOGLE_SHEET_LOG_URL, 30_000, 8, undefined,
+//   process.env.NODE_ENV === "production" ? "/app/data/log-queue.sqlite" : ":memory:",
+// );
 
 export const coreDbLogForwarder = new GoogleSheetLogForwarder(
   `${config.coreServerUrl}/internal/v1/vendor-request-logs`,
